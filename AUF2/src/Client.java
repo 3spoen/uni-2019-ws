@@ -20,27 +20,36 @@ public class Client {
         String username;
         String password;
         String login;
+        System.out.println("register " + "\n" + "login");
+        String userChoice = scn.nextLine().toUpperCase();
+
 
         //Ask User to Register or Login and write choice to output stream
-        System.out.println("/register " + "\n" + "/login");
-        String userChoice = scn.nextLine().toUpperCase();
-        if (userChoice.equals("LOGIN") || userChoice.equals("REGISTER"))
+        while (userChoice!=null) {
+
+            if(!userChoice.equals("LOGIN") || !userChoice.equals("REGISTER")){
+                System.out.println("Invalid Input, try again please");
+                System.out.println("register " + "\n" + "login");
+                userChoice = scn.nextLine().toUpperCase();
+            }if (userChoice.equals("LOGIN") || userChoice.equals("REGISTER")) {
             System.out.println("Please Enter  Username and Password");
-
-        out.println(userChoice);
-
+            out.println(userChoice);
+            break;
+        }
+        }
         while ((username = scn.nextLine()) != null
                 && (password = scn.nextLine()) != null) {
             out.println(username);
             out.println(password);
             login = in.readLine();
 
-            if (login.equals("true")) {
+            if (login.equals(" Login Accepted!")||login.equals("Registered New User")) {
                 System.out.println(in.readLine());
                 break;
             }
-            else
-                System.out.println(in.readLine());
+            else if(login.equals("\nUsername is Already logged in please try again \n Register or Login? ")||login.equals("\nUsername is Already taken  please try again \n Register or Login? "))
+                System.out.println("\nInvalid Username or Password \n please try again");
+            break;
         }
 
         // sendMessage thread
@@ -75,9 +84,7 @@ public class Client {
                 }
             }
         });
-
         sendMessage.start();
         readMessage.start();
-
     }
 }

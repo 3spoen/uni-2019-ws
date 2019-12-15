@@ -15,17 +15,18 @@ public class Server {
 
     private static Set<String> names = new HashSet<>();
     private static Set<PrintWriter> writers = new HashSet<>();
-    private static PrintWriter out; private static BufferedReader in;
+    private static PrintWriter out;
+    private static BufferedReader in;
     public static File users;
 
     public static void main(String[] args) throws Exception {
 
         try (var listener = new ServerSocket(51730)) {
             System.out.println("The game server is running...");
-            users = new File("F:" + File.separator + "AUF2" + File.separator + "src" + File.separator + "accounts.txt");
+            users = new File("D:" + File.separator + "AUF2" + File.separator + "uni-2019-ws" + File.separator + "AUF2" + File.separator + "src" + File.separator + "accounts.txt");
             ExecutorService pool = Executors.newFixedThreadPool(10);
             while (true) {
-                pool.execute(new Handler(listener.accept(), out,in));
+                pool.execute(new Handler(listener.accept(), out, in));
             }
         }
 
@@ -47,21 +48,30 @@ public class Server {
                     new InputStreamReader(socket.getInputStream()));
         }
 
-        /*Handler(Socket socket) throws IOException {
-            this.socket = socket;
-        }*/
 
         @Override
         public void run() {
             System.out.println("Connected: " + socket);
+            String userChoice = null;
             try {
-                registerUser();
+                userChoice = in.readLine();
+                if (userChoice.toUpperCase().equals("REGISTER")) {
+                    registerUser();
+                } else if (userChoice.toUpperCase().equals("LOGIN")) {
+                    logUser();
+                }  else
+                    run();
+
+
                 chat();
                 socket.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }
+        }
 
+        public void list() {
+            out.println(names);
         }
 
         public void chat() throws IOException {
@@ -71,11 +81,17 @@ public class Server {
                 printWriter.println(username + " has joined");
                 printWriter.flush();
             }
-            //names
+            //The synchronization is mainly used to
+            //To prevent thread interference.
+            //To prevent consistency problem.
             synchronized (names) {
-                if (!username.isBlank() && !names.contains(username)) {
-                    names.add(username);
-                    out.println(names);
+                try {
+                    if (!username.isBlank() && !names.contains(username)) {
+                        names.add(username);
+                        out.println(names);
+                    }
+                } catch (NullPointerException e) {
+                    e.printStackTrace();
                 }
             }
             // Accept messages from this client and broadcast them.
@@ -83,9 +99,10 @@ public class Server {
                 String input = in.readLine();
                 if (input.toLowerCase().startsWith("sign out"))
                     break;
-
+                if (input.toLowerCase().startsWith("list"))
+                    list();
                 for (PrintWriter writer : writers) {
-                    writer.println( username + ": \n" + input);
+                    writer.println("[" + username + "]" + ": " + input);
                     writer.flush();
                 }
             }
@@ -98,82 +115,82 @@ public class Server {
             writers.remove(out);
         }
 
+
+        public void logUser() throws IOException {
+            try (
+                    // create CSVWriter object filewriter object as parameter
+                    CSVWriter writer = new CSVWriter(new FileWriter(users.getAbsoluteFile(), true));
+            ) {
+                String readUsername;
+                String readPassword;
+                boolean userExists = false;
+           out.println("Please Enter  Username and Password");
+
+                while (((readUsername = in.readLine()) != null) &&
+                        ((readPassword = in.readLine()) != null)) {
+                    String[] nextRecord;
+                    CSVReader reader = new CSVReader(new FileReader(users));
+// to make the userExists in the right value
+                    while ((((nextRecord = reader.readNext())) != null)) {
+                        if (nextRecord[0].equals(readUsername)) {
+                            if (nextRecord[1].equals(readPassword)) {
+                                userExists = true;
+                            }
+                        }
+                    }
+                        if (userExists && !names.contains(readUsername)) {
+
+                            out.println(readUsername + " Login Accepted!");
+                            username = readUsername;
+                            System.out.println("Client: " + socket + " logged in with username " + readUsername);
+                        } else {
+                            out.println("\nUsername is Already logged in please try again \n Register or Login? ");
+                            run();
+                        }
+                        break;
+
+
+                }
+            } catch (CsvValidationException e) {
+                e.printStackTrace();
+            }
+        }
+
+
         public void registerUser() throws IOException {
             try (
                     // create CSVWriter object filewriter object as parameter
                     CSVWriter writer = new CSVWriter(new FileWriter(users.getAbsoluteFile(), true));
-
             ) {
                 String readUsername;
                 String readPassword;
-                String userChoice = in.readLine();
-                if (userChoice.equals("REGISTER")) {
-                    boolean userExists = false;
-                    while (!userExists) {
+                boolean userExists = false;
+                String[] nextRecord;
+               out.println("Please Enter  Username and Password");
+                CSVReader reader = new CSVReader(new FileReader(users));
+                while (((readUsername = in.readLine()) != null) &&
+                        ((readPassword = in.readLine()) != null && !userExists)) {
 
-                        while (((readUsername = in.readLine()) != null) &&
-                                ((readPassword = in.readLine()) != null)) {
-
-                            String[] nextRecord;
-                            userExists = false;
-                            CSVReader reader = new CSVReader(new FileReader(users));
-                            while ((((nextRecord = reader.readNext())) != null) && userExists == false) {
-                                if (nextRecord[0].equals(readUsername)) {
-                                    System.out.println("a client entered an already taken username");
-                                    out.println("false");
-                                    out.println("Username Already Taken. \n Please enter Username and Password");
-                                    userExists = true;
-                                }
-                            }
-                            if (userExists == false) {
-
-                                String[] data = {readUsername, readPassword};
-                                System.out.println(socket +"Registered New User");
-                                out.println("true");
-                                out.println("---------");
-                                username = readUsername;
-                                writer.writeNext(data);
-                                userExists = true;
-                                break;
-                            }
+                    while ((nextRecord = reader.readNext()) != null) {
+                        if (nextRecord[0].equals(readUsername)) {
+                            out.println("\nUsername is Already taken  please try again \n Register or Login? ");
+                            userExists = true;
+                            run();
                         }
                     }
-                } else {
-                    boolean loginCheck = false;
-                    while (((readUsername = in.readLine()) != null) &&
-                            ((readPassword = in.readLine()) != null)) {
-                        //System.gc();
-                        String[] nextRecord;
-                        CSVReader reader = new CSVReader(new FileReader(users));
-
-                        while ((((nextRecord = reader.readNext())) != null) && loginCheck == false) {
-                            if (nextRecord[0].equals(readUsername)) {
-                                if (nextRecord[1].equals(readPassword))
-                                    loginCheck = true;
-                            }
-                        }
-                        if (loginCheck == true&& !names.contains(readUsername)) {
-                            out.println("true");
-                            out.println(readUsername + " Login Accepted!");
-                            username = readUsername;
-                            System.out.println("Client: " + socket + " logged in with username " + readUsername);
-                            break;
-
-                        } else
-                            out.println("Login failed. Please try again.");
+                    if (!userExists) {
+                        String[] data = {readUsername, readPassword};
+                        System.out.println(socket );
+                        out.println("Registered New User");
+                        username = readUsername;
+                        writer.writeNext(data);
+                        break;
                     }
                 }
 
-            } catch (
-                    CsvValidationException e) {
+            } catch (CsvValidationException e) {
                 e.printStackTrace();
-            }/*finally {
-                try {
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-        }*/
-
+            }
         }
     }
 }
